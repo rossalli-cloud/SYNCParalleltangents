@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#1e1610">
+  <title>Parallel Tangents · UTC Sync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1e1610;
+      --bg-deep:   #0e0b07;
+      --bg-mid:    #140f08;
+      --border:    #3a2e1e;
+      --border-dim:#2a1e0e;
+      --gold:      #f0c84a;
+      --gold-lt:   #ffe066;
+      --gold-dk:   #c8960a;
+      --text:      #d4c4a0;
+      --text-dim:  #8a7355;
+      --text-muted:#4a3820;
+      --text-dark: #6a5030;
+      --green:     #6abf69;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: linear-gradient(160deg, #1a1200 0%, #0a0a0a 50%, #0d0a1a 100%);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 12px 48px;
+      font-family: 'IBM Plex Mono', monospace;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .shell {
+      background: linear-gradient(180deg, #3a2800 0%, #1a1000 60%, #0e0b07 100%);
+      border-radius: 20px;
+      padding: 28px 24px 24px;
+      width: 100%;
+      max-width: 420px;
+      color: var(--text);
+      border: 1.5px solid var(--gold);
+      position: relative;
+      overflow: hidden;
+    }
+    .shell::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(240,200,74,0.06) 3px, rgba(240,200,74,0.06) 4px);
+      pointer-events: none;
+      border-radius: 20px;
+    }
+
+    .deck-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 20px;
+      white-space: nowrap;
+    }
+
+    /* Tape Window */
+    .tape-window {
+      background: var(--bg-deep);
+      border-radius: 14px;
+      border: 2px solid var(--gold);
+      padding: 18px 16px 14px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .tape-window::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 12px;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.7);
+      pointer-events: none;
+    }
+
+    .reels-row {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .reel-wrap { position: relative; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; }
+    .reel {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 2px solid var(--gold);
+      background: radial-gradient(circle at 50% 50%, #2a1f0e 0%, #1a1208 60%, #0e0b07 100%);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .reel.spinning      { animation: reelSpin 1.8s linear infinite; }
+    .reel.spinning-slow { animation: reelSpin 3.5s linear infinite; }
+    @keyframes reelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .reel svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .reel-hub {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #3a2c18;
+      border: 1.5px solid var(--gold);
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .track-label {
+      background: var(--gold);
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .label-sub {
+      font-size: 9px;
+      color: #5a3800;
+      letter-spacing: 0.2em;
+    }
+
+    .tape-path {
+      height: 6px;
+      background: var(--bg-mid);
+      border-radius: 3px;
+      margin: 0 8px 12px;
+      overflow: hidden;
+    }
+    .tape-sheen {
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(90deg, transparent, rgba(200,168,75,0.15), transparent);
+      animation: tapeMove 2s linear infinite;
+      animation-play-state: paused;
+    }
+    .tape-sheen.playing { animation-play-state: running; }
+    @keyframes tapeMove { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+
+    .vu-row {
+      display: flex;
+      gap: 3px;
+      justify-content: center;
+      align-items: flex-end;
+      height: 32px;
+    }
+    .vu-bar {
+      width: 5px;
+      border-radius: 2px;
+      background: var(--gold-dk);
+      opacity: 0.2;
+      height: 4px;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 10px;
+      color: var(--gold);
+      padding-top: 8px;
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
+    /* Countdown display */
+    .countdown-section {
+      text-align: center;
+      margin-bottom: 16px;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .countdown-number {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--gold);
+      line-height: 1;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    .countdown-number.urgent { color: #e87040; }
+    .countdown-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+    .show-time-display {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      margin-top: 4px;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .play-btn {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: var(--gold-dk);
+      border: none;
+      color: #1a1000;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin: 0 auto;
+    }
+    .play-btn:hover  { background: var(--gold); }
+    .play-btn:active { transform: scale(0.95); }
+    .play-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* Bottom message */
+    .sync-msg {
+      background: var(--bg-deep);
+      border: 1px solid var(--border-dim);
+      border-radius: 6px;
+      color: var(--gold);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 10px 12px;
+      text-align: center;
+      line-height: 1.6;
+    }
+
+    .status-row {
+      margin-top: 10px;
+      font-size: 10px;
+      color: var(--text-dark);
+      min-height: 14px;
+      letter-spacing: 0.04em;
+      text-align: center;
+    }
+    .status-row.ok { color: var(--green); }
+
+    .toast {
+      position: fixed;
+      bottom: 32px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(200,168,75,0.95);
+      color: #1a1000;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      padding: 10px 20px;
+      border-radius: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="deck-title">Parallel Tangents &middot; UTC Sync</div>
+
+  <div class="tape-window">
+    <div class="reels-row">
+      <div class="reel-wrap">
+        <div class="reel" id="reelL">
+          <svg viewBox="0 0 82 82"><g stroke="var(--gold)" stroke-width="1.5" fill="none">
+            <circle cx="41" cy="41" r="32"/>
+            <circle cx="41" cy="41" r="24"/>
+            <circle cx="41" cy="41" r="16"/>
+            <circle cx="41" cy="41" r="8"/>
+          </g></svg>
+          <div class="reel-hub"></div>
+        </div>
+      </div>
+      <div style="text-align:center;flex:1;padding:0 10px;">
+        <div class="track-label">
+          <div class="label-sub">A &middot; SIDE</div>
+        </div>
+      </div>
+      <div class="reel-wrap">
+        <div class="reel" id="reelR">
+          <svg viewBox="0 0 82 82"><g stroke="var(--gold)" stroke-width="1.5" fill="none">
+            <circle cx="41" cy="41" r="32"/>
+            <circle cx="41" cy="41" r="24"/>
+            <circle cx="41" cy="41" r="16"/>
+            <circle cx="41" cy="41" r="8"/>
+          </g></svg>
+          <div class="reel-hub"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tape-path"><div class="tape-sheen" id="tapeSheen"></div></div>
+    <div class="vu-row" id="vuRow"></div>
+    <div class="time-row">
+      <span id="currentTime">0:00</span>
+      <span id="duration">—</span>
+    </div>
+  </div>
+
+  <!-- Countdown -->
+  <div class="countdown-section" id="countdownSection">
+    <div class="countdown-number" id="countdownNumber">—</div>
+    <div class="countdown-label" id="countdownLabel">loading…</div>
+    <div class="show-time-display" id="showTimeDisplay"></div>
+  </div>
+
+  <!-- Play button (manual fallback) -->
+  <div class="controls">
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">
+      <svg id="playIcon"  width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+      <svg id="pauseIcon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+  </div>
+
+  <div class="sync-msg">wait for all to sync<br>before pressing play</div>
+  <div class="status-row" id="statusRow"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── !! CHANGE THIS EACH DAY !! ───────────────────────────────────────────────
+const SHOW_TIME = '2026-04-22T20:00:00Z'; // UTC start time — update before each show
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TRACK_URL = 'https://rossalli-cloud.github.io/SYNCparalleltangents/paralleltangents%20mixdown1.mp3';
+
+let audio     = null;
+let isPlaying = false;
+let syncEpoch = null;
+let syncTimer = null;
+let vuTimer   = null;
+let fired     = false;
+
+function getUTC()  { return Date.now() / 1000; }
+function showEpoch() { return new Date(SHOW_TIME).getTime() / 1000; }
+
+function fmt(s) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  return Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+}
+
+function showToast(msg, dur = 2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function setStatus(msg, ok = false) {
+  const s = document.getElementById('statusRow');
+  s.textContent = msg;
+  s.className = 'status-row' + (ok ? ' ok' : '');
+}
+
+// Build VU bars
+(function() {
+  const row = document.getElementById('vuRow');
+  for (let i = 0; i < 18; i++) {
+    const b = document.createElement('div');
+    b.className = 'vu-bar'; b.id = 'vu' + i;
+    row.appendChild(b);
+  }
+})();
+
+function animateVU() {
+  for (let i = 0; i < 18; i++) {
+    const b = document.getElementById('vu' + i);
+    if (!b) continue;
+    b.style.height  = (4 + Math.random() * 26) + 'px';
+    b.style.opacity = 0.3 + Math.random() * 0.65;
+  }
+}
+
+function stopVU() {
+  clearInterval(vuTimer);
+  for (let i = 0; i < 18; i++) {
+    const b = document.getElementById('vu' + i);
+    if (b) { b.style.height = '4px'; b.style.opacity = '0.2'; }
+  }
+}
+
+function reelsPlay() {
+  document.getElementById('reelL').className = 'reel spinning';
+  document.getElementById('reelR').className = 'reel spinning-slow';
+  document.getElementById('tapeSheen').classList.add('playing');
+}
+function reelsStop() {
+  document.getElementById('reelL').className = 'reel';
+  document.getElementById('reelR').className = 'reel';
+  document.getElementById('tapeSheen').classList.remove('playing');
+}
+
+// ─── Countdown ────────────────────────────────────────────────────────────────
+function updateCountdown() {
+  const now  = getUTC();
+  const target = showEpoch();
+  const left = target - now;
+
+  const numEl   = document.getElementById('countdownNumber');
+  const labelEl = document.getElementById('countdownLabel');
+  const timeEl  = document.getElementById('showTimeDisplay');
+
+  // Show the show time in local time
+  timeEl.textContent = 'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  if (left > 0) {
+    // Still counting down
+    const h = Math.floor(left / 3600);
+    const m = Math.floor((left % 3600) / 60);
+    const s = Math.floor(left % 60);
+
+    if (h > 0) {
+      numEl.textContent = h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    } else if (m > 0) {
+      numEl.textContent = m + ':' + String(s).padStart(2,'0');
+    } else {
+      numEl.textContent = s;
+    }
+
+    numEl.className = 'countdown-number' + (left <= 10 ? ' urgent' : '');
+    labelEl.textContent = left <= 10 ? 'starting soon' : 'until show starts';
+
+  } else if (!fired) {
+    // Time to fire!
+    fired = true;
+    numEl.textContent = '▶';
+    labelEl.textContent = 'starting now';
+    fireSync();
+  }
+}
+
+// ─── Fire at show time ────────────────────────────────────────────────────────
+function fireSync() {
+  if (!audio) return;
+  syncEpoch = showEpoch();
+  const offset = getUTC() - syncEpoch;
+  audio.currentTime = Math.max(0, offset);
+
+  audio.play().then(() => {
+    isPlaying = true;
+    reelsPlay();
+    document.getElementById('playIcon').style.display  = 'none';
+    document.getElementById('pauseIcon').style.display = '';
+    startSync();
+    vuTimer = setInterval(animateVU, 80);
+    setStatus('playing · in sync', true);
+    document.getElementById('countdownLabel').textContent = 'live · in sync';
+  }).catch(() => {
+    // iOS blocked autoplay — prompt manual tap
+    setStatus('tap play to join');
+    showToast('tap ▶ to join', 4000);
+    document.getElementById('countdownLabel').textContent = 'tap play to join';
+    document.getElementById('playBtn').style.background = 'var(--gold)';
+  });
+}
+
+// ─── Manual play/pause ────────────────────────────────────────────────────────
+function togglePlay() {
+  if (!audio) { showToast('loading track…'); return; }
+
+  if (isPlaying) {
+    audio.pause();
+    isPlaying = false;
+    clearInterval(syncTimer);
+    stopVU();
+    reelsStop();
+    document.getElementById('playIcon').style.display  = '';
+    document.getElementById('pauseIcon').style.display = 'none';
+    document.getElementById('playBtn').style.background = '';
+    setStatus('paused');
+    return;
+  }
+
+  // Seek to correct sync position
+  syncEpoch = showEpoch();
+  const offset = getUTC() - syncEpoch;
+  if (offset >= 0 && isFinite(audio.duration) && offset < audio.duration) {
+    audio.currentTime = offset;
+  } else if (offset >= (audio.duration || 0)) {
+    setStatus('show has ended');
+    return;
+  }
+
+  audio.play().then(() => {
+    isPlaying = true;
+    reelsPlay();
+    document.getElementById('playIcon').style.display  = 'none';
+    document.getElementById('pauseIcon').style.display = '';
+    document.getElementById('playBtn').style.background = '';
+    startSync();
+    vuTimer = setInterval(animateVU, 80);
+    setStatus('playing · in sync', true);
+    document.getElementById('countdownLabel').textContent = 'live · in sync';
+  }).catch(() => {
+    setStatus('tap play again');
+    showToast('tap play again');
+  });
+}
+
+// ─── Drift correction ─────────────────────────────────────────────────────────
+function startSync() {
+  clearInterval(syncTimer);
+  syncTimer = setInterval(() => {
+    if (!isPlaying || !syncEpoch || !audio || !audio.duration) return;
+    const expected = getUTC() - syncEpoch;
+    const drift = audio.currentTime - expected;
+    if (Math.abs(drift) > 0.5) {
+      audio.currentTime = Math.min(Math.max(expected, 0), audio.duration);
+    }
+  }, 2000);
+}
+
+// ─── Load track ───────────────────────────────────────────────────────────────
+function loadTrack(url) {
+  audio = new Audio();
+  audio.crossOrigin = 'anonymous';
+  audio.preload = 'auto';
+
+  audio.addEventListener('loadedmetadata', () => {
+    document.getElementById('duration').textContent =
+      isFinite(audio.duration) ? fmt(audio.duration) : '—';
+  });
+
+  audio.addEventListener('timeupdate', () => {
+    document.getElementById('currentTime').textContent = fmt(audio.currentTime);
+  });
+
+  audio.addEventListener('ended', () => {
+    isPlaying = false;
+    clearInterval(syncTimer);
+    stopVU();
+    reelsStop();
+    document.getElementById('playIcon').style.display  = '';
+    document.getElementById('pauseIcon').style.display = 'none';
+    setStatus('track ended');
+  });
+
+  audio.src = url;
+  audio.load();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadTrack(TRACK_URL);
+
+// Show local time of show
+document.getElementById('showTimeDisplay').textContent =
+  'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+// If show time has already passed, fire immediately
+if (getUTC() >= showEpoch()) {
+  fired = true;
+  document.getElementById('countdownNumber').textContent = '▶';
+  document.getElementById('countdownLabel').textContent = 'tap play to join';
+  document.getElementById('playBtn').style.background = 'var(--gold)';
+  syncEpoch = showEpoch();
+} else {
+  // Start countdown
+  setInterval(updateCountdown, 1000);
+  updateCountdown();
+}
+</script>
+</body>
+</html>
