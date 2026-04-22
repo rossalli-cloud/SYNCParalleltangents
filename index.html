@@ -556,8 +556,13 @@ function updateCountdown() {
   numEl.textContent = m + ':' + String(s).padStart(2,'0');
 
   numEl.className   = 'countdown-number' + (left <= 10 ? ' urgent' : '');
-  labelEl.textContent = left <= 10 ? '⚡ sounding soon' : 'until show starts';
-  document.getElementById('showTimeDisplay').textContent = left <= 10 ? '' : 'lock & pocket your device';
+  if (left <= 10) {
+    labelEl.textContent = '⚡ sounding soon';
+    document.getElementById('showTimeDisplay').textContent = '';
+  } else {
+    labelEl.textContent = 'until show starts';
+    document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
+  }
 }
 
 // ─── Fire ─────────────────────────────────────────────────────────────────────
@@ -576,8 +581,7 @@ function fireSync() {
     showToast('🔴 live · in sync');
   }).catch(() => {
     document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'tap to join';
-    document.getElementById('joinBtn').style.display = 'block';
+    document.getElementById('countdownLabel').textContent  = 'live · in sync';
   });
 }
 
@@ -673,11 +677,9 @@ function setShowTimes() {
   updateHostTimesList();
   showToast('show time set!');
 
-  const next = getNextShowEpoch();
-  document.getElementById('showTimeDisplay').textContent =
-    'show: ' + new Date(next * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   document.getElementById('countdownNumber').textContent = '—';
   document.getElementById('countdownLabel').textContent  = 'until show starts';
+  document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
   setInterval(updateCountdown, 500);
   updateCountdown();
 }
