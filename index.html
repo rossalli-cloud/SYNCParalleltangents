@@ -568,7 +568,17 @@ function updateCountdown() {
 // ─── Fire ─────────────────────────────────────────────────────────────────────
 function fireSync() {
   if (!audio) return;
-  // Always start from the beginning — syncEpoch is the moment the track starts at 0
+  syncEpoch = getNextShowEpoch();
+  // Never try autoplay — always show the tap button so iOS gets a proper gesture
+  document.getElementById('countdownNumber').textContent = '▶';
+  document.getElementById('countdownLabel').textContent  = 'tap to sound';
+  document.getElementById('showTimeDisplay').textContent = '';
+  document.getElementById('joinBtn').style.display = 'block';
+}
+
+// ─── Tap to sound ─────────────────────────────────────────────────────────────
+function joinNow() {
+  if (!audio) return;
   audio.currentTime = 0;
 
   audio.play().then(() => {
@@ -577,27 +587,6 @@ function fireSync() {
     startSync();
     vuTimer = setInterval(animateVU, 80);
     document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'live · in sync';
-    document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
-    showToast('🔴 live · in sync');
-  }).catch(() => {
-    document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'tap to sound';
-    document.getElementById('joinBtn').style.display = 'block';
-  });
-}
-
-// ─── iOS join ─────────────────────────────────────────────────────────────────
-function joinNow() {
-  if (!audio || !syncEpoch) return;
-  const offset = Math.max(0, getUTC() - syncEpoch);
-  audio.currentTime = Math.min(offset, audio.duration || 0);
-
-  audio.play().then(() => {
-    isPlaying = true;
-    reelsPlay();
-    startSync();
-    vuTimer = setInterval(animateVU, 80);
     document.getElementById('countdownLabel').textContent = 'live · in sync';
     document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
     document.getElementById('joinBtn').style.display = 'none';
