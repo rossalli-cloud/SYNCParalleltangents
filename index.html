@@ -557,6 +557,7 @@ function updateCountdown() {
 
   numEl.className   = 'countdown-number' + (left <= 10 ? ' urgent' : '');
   labelEl.textContent = left <= 10 ? '⚡ sounding soon' : 'until show starts';
+  document.getElementById('showTimeDisplay').textContent = left <= 10 ? '' : 'lock & pocket your device';
 }
 
 // ─── Fire ─────────────────────────────────────────────────────────────────────
