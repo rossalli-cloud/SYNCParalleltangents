@@ -446,7 +446,10 @@ function updateCountdown() {
     // Time to fire!
     fired = true;
     numEl.textContent = '▶';
-    labelEl.textContent = 'starting now';
+    labelEl.textContent = 'tap to join';
+    document.getElementById('countdownSection').style.cursor = 'pointer';
+    document.getElementById('countdownSection').onclick = togglePlay;
+    document.getElementById('playBtn').style.display = 'none';
     fireSync();
   }
 }
@@ -541,6 +544,8 @@ function loadTrack(url) {
   audio.addEventListener('loadedmetadata', () => {
     document.getElementById('duration').textContent =
       isFinite(audio.duration) ? fmt(audio.duration) : '—';
+    // Now that audio is ready, initialize sync
+    initSync();
   });
 
   audio.addEventListener('timeupdate', () => {
@@ -561,25 +566,37 @@ function loadTrack(url) {
   audio.load();
 }
 
+// ─── Init sync after audio is ready ──────────────────────────────────────────
+function initSync() {
+  // Show local time of show
+  document.getElementById('showTimeDisplay').textContent =
+    'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  if (getUTC() >= showEpoch()) {
+    // Show time has already passed — show tap to join
+    fired = true;
+    syncEpoch = showEpoch();
+    const offset = getUTC() - syncEpoch;
+    if (offset >= audio.duration) {
+      document.getElementById('countdownNumber').textContent = '—';
+      document.getElementById('countdownLabel').textContent = 'show has ended';
+      return;
+    }
+    document.getElementById('countdownNumber').textContent = '▶';
+    document.getElementById('countdownLabel').textContent = 'tap to join';
+    document.getElementById('countdownSection').style.cursor = 'pointer';
+    document.getElementById('countdownSection').onclick = togglePlay;
+    document.getElementById('playBtn').style.display = 'none';
+  } else {
+    // Countdown to show time
+    document.getElementById('playBtn').style.display = 'none';
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadTrack(TRACK_URL);
-
-// Show local time of show
-document.getElementById('showTimeDisplay').textContent =
-  'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-// If show time has already passed, fire immediately
-if (getUTC() >= showEpoch()) {
-  fired = true;
-  document.getElementById('countdownNumber').textContent = '▶';
-  document.getElementById('countdownLabel').textContent = 'tap play to join';
-  document.getElementById('playBtn').style.background = 'var(--gold)';
-  syncEpoch = showEpoch();
-} else {
-  // Start countdown
-  setInterval(updateCountdown, 1000);
-  updateCountdown();
-}
 </script>
 </body>
 </html>
