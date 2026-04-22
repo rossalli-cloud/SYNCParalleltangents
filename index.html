@@ -551,17 +551,9 @@ function updateCountdown() {
     return;
   }
 
-  const h = Math.floor(left / 3600);
-  const m = Math.floor((left % 3600) / 60);
+  const m = Math.floor(left / 60);
   const s = Math.floor(left % 60);
-
-  if (h > 0) {
-    numEl.textContent = h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-  } else if (m > 0) {
-    numEl.textContent = m + ':' + String(s).padStart(2,'0');
-  } else {
-    numEl.textContent = s;
-  }
+  numEl.textContent = m + ':' + String(s).padStart(2,'0');
 
   numEl.className   = 'countdown-number' + (left <= 10 ? ' urgent' : '');
   labelEl.textContent = left <= 10 ? '⚡ sounding soon' : 'until show starts';
@@ -570,8 +562,8 @@ function updateCountdown() {
 // ─── Fire ─────────────────────────────────────────────────────────────────────
 function fireSync() {
   if (!audio) return;
-  const offset = Math.max(0, getUTC() - syncEpoch);
-  audio.currentTime = Math.min(offset, audio.duration || 0);
+  // Always start from the beginning — syncEpoch is the moment the track starts at 0
+  audio.currentTime = 0;
 
   audio.play().then(() => {
     isPlaying = true;
@@ -611,9 +603,10 @@ function startSync() {
   syncTimer = setInterval(() => {
     if (!isPlaying || !syncEpoch || !audio || !audio.duration) return;
     const expected = getUTC() - syncEpoch;
-    const drift    = audio.currentTime - expected;
-    if (Math.abs(drift) > 0.5) {
-      audio.currentTime = Math.min(Math.max(expected, 0), audio.duration);
+    if (expected >= audio.duration) return; // track should be ending naturally
+    const drift = audio.currentTime - expected;
+    if (Math.abs(drift) > 1.0) {
+      audio.currentTime = Math.min(Math.max(expected, 0), audio.duration - 0.5);
     }
   }, 2000);
 }
