@@ -74,7 +74,6 @@
       white-space: nowrap;
     }
 
-    /* Tape Window */
     .tape-window {
       background: var(--bg-deep);
       border-radius: 14px;
@@ -166,7 +165,6 @@
       padding-right: 4px;
     }
 
-    /* Countdown */
     .countdown-section {
       text-align: center;
       margin-bottom: 20px;
@@ -197,24 +195,22 @@
       margin-top: 4px;
     }
 
-    /* Join button */
-    .join-btn {
+    .tap-btn {
       display: none;
       background: var(--gold);
       border: none;
       border-radius: 10px;
       color: #1a1000;
       font-family: 'IBM Plex Mono', monospace;
-      font-size: 13px;
+      font-size: 16px;
       font-weight: 700;
       letter-spacing: 0.08em;
-      padding: 14px 32px;
+      padding: 16px 32px;
       cursor: pointer;
       width: 100%;
       margin-bottom: 16px;
     }
 
-    /* Host trigger */
     .host-trigger {
       text-align: center;
       margin-top: 16px;
@@ -232,7 +228,6 @@
     }
     .host-trigger button:hover { opacity: 1; color: var(--gold); }
 
-    /* Host panel */
     .host-panel {
       display: none;
       border-top: 1px solid var(--border-dim);
@@ -295,7 +290,6 @@
       text-align: center;
     }
 
-    /* PIN overlay */
     .pin-overlay {
       position: fixed;
       inset: 0;
@@ -345,12 +339,7 @@
       margin-top: 8px;
       letter-spacing: 0.1em;
     }
-    .pin-error {
-      font-size: 10px;
-      color: #e87040;
-      min-height: 14px;
-      margin-top: 4px;
-    }
+    .pin-error { font-size: 10px; color: #e87040; min-height: 14px; margin-top: 4px; }
 
     .toast {
       position: fixed;
@@ -375,7 +364,6 @@
 <div class="shell">
   <div class="deck-title">Parallel Tangents &middot; UTC Sync</div>
 
-  <!-- Tape window -->
   <div class="tape-window">
     <div class="reels-row">
       <div class="reel-wrap">
@@ -414,34 +402,29 @@
     </div>
   </div>
 
-  <!-- Countdown -->
   <div class="countdown-section">
     <div class="countdown-number" id="countdownNumber">—</div>
-    <div class="countdown-label"  id="countdownLabel">loading…</div>
+    <div class="countdown-label"  id="countdownLabel">connecting…</div>
     <div class="show-time-display" id="showTimeDisplay"></div>
   </div>
 
-  <!-- iOS join button -->
-  <button class="join-btn" id="joinBtn" onclick="joinNow()">tap to sound</button>
+  <button class="tap-btn" id="tapBtn" onclick="tapToSound()">tap to sound</button>
 
-  <!-- Host trigger -->
   <div class="host-trigger">
     <button onclick="showPinOverlay()">· host ·</button>
   </div>
 
-  <!-- Host panel -->
   <div class="host-panel" id="hostPanel">
     <div class="host-label">set show time (your local time)</div>
     <div class="time-picker-row">
       <label>show</label>
       <input type="datetime-local" id="showTime1">
     </div>
-    <button class="set-btn" onclick="setShowTimes()">set show time</button>
+    <button class="set-btn" onclick="setShowTime()">set show time</button>
     <div class="host-times-list" id="hostTimesList"></div>
   </div>
 </div>
 
-<!-- PIN overlay -->
 <div class="pin-overlay" id="pinOverlay">
   <div class="pin-box">
     <div class="pin-title">Host Access</div>
@@ -454,26 +437,19 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── Default show times (fallback if host hasn't set them) ────────────────────
-const DEFAULT_SHOW_TIMES = [
-  '2026-04-24T00:10:00Z',  // 8:10 PM EST Thursday April 23
-  '2026-04-25T00:10:00Z',  // 8:10 PM EST Friday April 24
-  '2026-04-26T18:10:00Z',  // 2:10 PM EST Saturday April 26
-];
-const HOST_PIN = '2257';
+// ─── Config ───────────────────────────────────────────────────────────────────
+const FIREBASE_URL = 'https://parallelsync-56189-default-rtdb.firebaseio.com';
+const TRACK_URL    = 'https://rossalli-cloud.github.io/SYNCParalleltangents/paralleltangentsmixdown1.mp3';
+const HOST_PIN     = '2257';
 
 // ─── State ────────────────────────────────────────────────────────────────────
-const TRACK_URL = 'https://rossalli-cloud.github.io/SYNCParalleltangents/paralleltangentsmixdown1.mp3';
-
-let audio     = null;
-let isPlaying = false;
-let syncEpoch = null;
-let fired     = false;
-let syncTimer = null;
-let vuTimer   = null;
-
-// Dynamic show times — host can update these
-let showTimes = DEFAULT_SHOW_TIMES.map(t => new Date(t).getTime() / 1000);
+let audio      = null;
+let isPlaying  = false;
+let showEpoch  = null;   // UTC seconds of show start
+let fired      = false;
+let syncTimer  = null;
+let vuTimer    = null;
+let countdownInterval = null;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function getUTC() { return Date.now() / 1000; }
@@ -490,15 +466,7 @@ function showToast(msg, dur = 2500) {
   setTimeout(() => t.classList.remove('show'), dur);
 }
 
-function getNextShowEpoch() {
-  const now = getUTC();
-  for (const t of showTimes) {
-    if (t > now) return t;
-  }
-  return showTimes[showTimes.length - 1];
-}
-
-// ─── Build VU bars ────────────────────────────────────────────────────────────
+// ─── VU bars ─────────────────────────────────────────────────────────────────
 (function() {
   const row = document.getElementById('vuRow');
   for (let i = 0; i < 18; i++) {
@@ -536,52 +504,91 @@ function reelsStop() {
   document.getElementById('tapeSheen').classList.remove('playing');
 }
 
+// ─── Firebase ─────────────────────────────────────────────────────────────────
+function listenToShowTime() {
+  const url = FIREBASE_URL + '/showtime.json';
+  // Poll every 5 seconds — simple and works on all browsers
+  function poll() {
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.epoch) {
+          onShowTimeReceived(data.epoch);
+        } else {
+          document.getElementById('countdownNumber').textContent = '—';
+          document.getElementById('countdownLabel').textContent  = 'waiting for host';
+          document.getElementById('showTimeDisplay').textContent = '';
+        }
+      })
+      .catch(() => {
+        document.getElementById('countdownLabel').textContent = 'connecting…';
+      });
+  }
+  poll();
+  setInterval(poll, 5000);
+}
+
+function pushShowTime(epoch) {
+  fetch(FIREBASE_URL + '/showtime.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ epoch: epoch })
+  }).then(() => showToast('show time set — all phones updating!'))
+    .catch(() => showToast('error saving — check connection'));
+}
+
+function onShowTimeReceived(epoch) {
+  if (showEpoch === epoch) return; // no change
+  showEpoch = epoch;
+  fired = false;
+
+  clearInterval(countdownInterval);
+
+  const local = new Date(epoch * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  document.getElementById('showTimeDisplay').textContent = 'show: ' + local;
+
+  if (getUTC() >= epoch) {
+    // Show time has passed — show tap button
+    fired = true;
+    document.getElementById('countdownNumber').textContent = '▶';
+    document.getElementById('countdownLabel').textContent  = 'tap to sound';
+    document.getElementById('showTimeDisplay').textContent = '';
+    document.getElementById('tapBtn').style.display = 'block';
+  } else {
+    // Start countdown
+    document.getElementById('tapBtn').style.display = 'none';
+    countdownInterval = setInterval(() => updateCountdown(epoch), 500);
+    updateCountdown(epoch);
+  }
+}
+
 // ─── Countdown ────────────────────────────────────────────────────────────────
-function updateCountdown() {
+function updateCountdown(epoch) {
   if (fired) return;
-  const showEpoch = getNextShowEpoch();
-  const left      = showEpoch - getUTC();
-  const numEl     = document.getElementById('countdownNumber');
-  const labelEl   = document.getElementById('countdownLabel');
+  const left  = epoch - getUTC();
+  const numEl = document.getElementById('countdownNumber');
+  const lblEl = document.getElementById('countdownLabel');
 
   if (left <= 0) {
-    fired     = true;
-    syncEpoch = showEpoch;
-    numEl.textContent   = '▶';
-    numEl.className     = 'countdown-number';
-    labelEl.textContent = 'sounding now';
+    fired = true;
+    clearInterval(countdownInterval);
+    numEl.textContent = '▶';
+    numEl.className   = 'countdown-number';
+    lblEl.textContent = 'tap to sound';
     document.getElementById('showTimeDisplay').textContent = '';
-    fireSync();
+    document.getElementById('tapBtn').style.display = 'block';
     return;
   }
 
   const m = Math.floor(left / 60);
   const s = Math.floor(left % 60);
-  numEl.textContent = m + ':' + String(s).padStart(2,'0');
-
+  numEl.textContent = m + ':' + String(s).padStart(2, '0');
   numEl.className   = 'countdown-number' + (left <= 10 ? ' urgent' : '');
-  if (left <= 10) {
-    labelEl.textContent = '⚡ sounding soon';
-    document.getElementById('showTimeDisplay').textContent = '';
-  } else {
-    labelEl.textContent = 'until show starts';
-    document.getElementById('showTimeDisplay').textContent = '';
-  }
-}
-
-// ─── Fire ─────────────────────────────────────────────────────────────────────
-function fireSync() {
-  if (!audio) return;
-  syncEpoch = getNextShowEpoch();
-  // Never try autoplay — always show the tap button so iOS gets a proper gesture
-  document.getElementById('countdownNumber').textContent = '▶';
-  document.getElementById('countdownLabel').textContent  = 'tap to sound';
-  document.getElementById('showTimeDisplay').textContent = '';
-  document.getElementById('joinBtn').style.display = 'block';
+  lblEl.textContent = left <= 10 ? '⚡ sounding soon' : 'until show starts';
 }
 
 // ─── Tap to sound ─────────────────────────────────────────────────────────────
-function joinNow() {
+function tapToSound() {
   if (!audio) return;
   audio.currentTime = 0;
 
@@ -591,9 +598,9 @@ function joinNow() {
     startSync();
     vuTimer = setInterval(animateVU, 80);
     document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent = 'live · in sync';
+    document.getElementById('countdownLabel').textContent  = 'live · in sync';
     document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
-    document.getElementById('joinBtn').style.display = 'none';
+    document.getElementById('tapBtn').style.display = 'none';
     showToast('🔴 live · in sync');
   }).catch(() => showToast('tap again'));
 }
@@ -602,9 +609,9 @@ function joinNow() {
 function startSync() {
   clearInterval(syncTimer);
   syncTimer = setInterval(() => {
-    if (!isPlaying || !syncEpoch || !audio || !audio.duration) return;
-    const expected = getUTC() - syncEpoch;
-    if (expected >= audio.duration) return; // track should be ending naturally
+    if (!isPlaying || !showEpoch || !audio || !audio.duration) return;
+    const expected = getUTC() - showEpoch;
+    if (expected >= audio.duration) return;
     const drift = audio.currentTime - expected;
     if (Math.abs(drift) > 1.0) {
       audio.currentTime = Math.min(Math.max(expected, 0), audio.duration - 0.5);
@@ -631,6 +638,7 @@ function loadTrack(url) {
     reelsStop();
     document.getElementById('countdownNumber').textContent = '—';
     document.getElementById('countdownLabel').textContent  = 'track ended';
+    document.getElementById('showTimeDisplay').textContent = '';
   });
   audio.src = url;
   audio.load();
@@ -654,7 +662,6 @@ function checkPin() {
   if (val === HOST_PIN) {
     hidePinOverlay();
     document.getElementById('hostPanel').classList.add('visible');
-    updateHostTimesList();
   } else {
     document.getElementById('pinError').textContent = 'incorrect pin';
     document.getElementById('pinInput').value = '';
@@ -662,55 +669,20 @@ function checkPin() {
 }
 
 // ─── Host panel ───────────────────────────────────────────────────────────────
-function setShowTimes() {
+function setShowTime() {
   const t1 = document.getElementById('showTime1').value;
   if (!t1) { showToast('enter a show time'); return; }
 
-  showTimes = [new Date(t1).getTime() / 1000];
-  fired     = false;
-  syncEpoch = null;
+  const epoch = new Date(t1).getTime() / 1000;
+  pushShowTime(epoch);
 
-  updateHostTimesList();
-  showToast('show time set!');
-
-  document.getElementById('countdownNumber').textContent = '—';
-  document.getElementById('countdownLabel').textContent  = 'until show starts';
-  document.getElementById('showTimeDisplay').textContent = '';
-  setInterval(updateCountdown, 500);
-  updateCountdown();
-}
-
-function updateHostTimesList() {
-  document.getElementById('hostTimesList').innerHTML =
-    showTimes.map(t =>
-      new Date(t * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})
-    ).join('<br>');
+  const local = new Date(epoch * 1000).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
+  document.getElementById('hostTimesList').textContent = local;
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadTrack(TRACK_URL);
-
-if (showTimes.length === 0) {
-  document.getElementById('countdownNumber').textContent = '—';
-  document.getElementById('countdownLabel').textContent  = 'waiting for host';
-  document.getElementById('showTimeDisplay').textContent = '';
-} else {
-  const nextEpoch = getNextShowEpoch();
-  document.getElementById('showTimeDisplay').textContent =
-    'show: ' + new Date(nextEpoch * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-
-  if (getUTC() >= nextEpoch) {
-    fired     = true;
-    syncEpoch = nextEpoch;
-    document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'tap to join';
-    document.getElementById('showTimeDisplay').textContent = '';
-    document.getElementById('joinBtn').style.display = 'block';
-  } else {
-    setInterval(updateCountdown, 500);
-    updateCountdown();
-  }
-}
+listenToShowTime();
 </script>
 </body>
 </html>
