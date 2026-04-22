@@ -422,7 +422,7 @@
   </div>
 
   <!-- iOS join button -->
-  <button class="join-btn" id="joinBtn" onclick="joinNow()">tap to join</button>
+  <button class="join-btn" id="joinBtn" onclick="joinNow()">tap to sound</button>
 
   <!-- Host trigger -->
   <div class="host-trigger">
@@ -561,7 +561,7 @@ function updateCountdown() {
     document.getElementById('showTimeDisplay').textContent = '';
   } else {
     labelEl.textContent = 'until show starts';
-    document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
+    document.getElementById('showTimeDisplay').textContent = '';
   }
 }
 
@@ -578,10 +578,12 @@ function fireSync() {
     vuTimer = setInterval(animateVU, 80);
     document.getElementById('countdownNumber').textContent = '▶';
     document.getElementById('countdownLabel').textContent  = 'live · in sync';
+    document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
     showToast('🔴 live · in sync');
   }).catch(() => {
     document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'live · in sync';
+    document.getElementById('countdownLabel').textContent  = 'tap to sound';
+    document.getElementById('joinBtn').style.display = 'block';
   });
 }
 
@@ -597,6 +599,7 @@ function joinNow() {
     startSync();
     vuTimer = setInterval(animateVU, 80);
     document.getElementById('countdownLabel').textContent = 'live · in sync';
+    document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
     document.getElementById('joinBtn').style.display = 'none';
     showToast('🔴 live · in sync');
   }).catch(() => showToast('tap again'));
@@ -679,7 +682,7 @@ function setShowTimes() {
 
   document.getElementById('countdownNumber').textContent = '—';
   document.getElementById('countdownLabel').textContent  = 'until show starts';
-  document.getElementById('showTimeDisplay').textContent = 'lock & pocket your device';
+  document.getElementById('showTimeDisplay').textContent = '';
   setInterval(updateCountdown, 500);
   updateCountdown();
 }
