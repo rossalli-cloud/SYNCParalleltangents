@@ -431,16 +431,12 @@
 
   <!-- Host panel -->
   <div class="host-panel" id="hostPanel">
-    <div class="host-label">set show times (your local time)</div>
+    <div class="host-label">set show time (your local time)</div>
     <div class="time-picker-row">
-      <label>show 1</label>
+      <label>show</label>
       <input type="datetime-local" id="showTime1">
     </div>
-    <div class="time-picker-row">
-      <label>show 2</label>
-      <input type="datetime-local" id="showTime2">
-    </div>
-    <button class="set-btn" onclick="setShowTimes()">set show times</button>
+    <button class="set-btn" onclick="setShowTimes()">set show time</button>
     <div class="host-times-list" id="hostTimesList"></div>
   </div>
 </div>
@@ -459,10 +455,7 @@
 
 <script>
 // ─── Default show times (fallback if host hasn't set them) ────────────────────
-const DEFAULT_SHOW_TIMES = [
-  '2026-04-23T00:00:00Z',  // 8:00 PM EST
-  '2026-04-23T00:30:00Z',  // 8:30 PM EST
-];
+const DEFAULT_SHOW_TIMES = [];
 const HOST_PIN = '2257';
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -677,27 +670,22 @@ function checkPin() {
 // ─── Host panel ───────────────────────────────────────────────────────────────
 function setShowTimes() {
   const t1 = document.getElementById('showTime1').value;
-  const t2 = document.getElementById('showTime2').value;
-  const newTimes = [];
+  if (!t1) { showToast('enter a show time'); return; }
 
-  if (t1) newTimes.push(new Date(t1).getTime() / 1000);
-  if (t2) newTimes.push(new Date(t2).getTime() / 1000);
-
-  if (newTimes.length === 0) { showToast('enter at least one time'); return; }
-
-  newTimes.sort();
-  showTimes = newTimes;
+  showTimes = [new Date(t1).getTime() / 1000];
   fired     = false;
   syncEpoch = null;
 
   updateHostTimesList();
-  showToast('show times set!');
+  showToast('show time set!');
 
   const next = getNextShowEpoch();
   document.getElementById('showTimeDisplay').textContent =
     'show: ' + new Date(next * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
   document.getElementById('countdownNumber').textContent = '—';
   document.getElementById('countdownLabel').textContent  = 'until show starts';
+  setInterval(updateCountdown, 500);
+  updateCountdown();
 }
 
 function updateHostTimesList() {
@@ -710,20 +698,26 @@ function updateHostTimesList() {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 loadTrack(TRACK_URL);
 
-const nextEpoch = getNextShowEpoch();
-document.getElementById('showTimeDisplay').textContent =
-  'show: ' + new Date(nextEpoch * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-
-if (getUTC() >= nextEpoch) {
-  fired     = true;
-  syncEpoch = nextEpoch;
-  document.getElementById('countdownNumber').textContent = '▶';
-  document.getElementById('countdownLabel').textContent  = 'tap to join';
+if (showTimes.length === 0) {
+  document.getElementById('countdownNumber').textContent = '—';
+  document.getElementById('countdownLabel').textContent  = 'waiting for host';
   document.getElementById('showTimeDisplay').textContent = '';
-  document.getElementById('joinBtn').style.display = 'block';
 } else {
-  setInterval(updateCountdown, 500);
-  updateCountdown();
+  const nextEpoch = getNextShowEpoch();
+  document.getElementById('showTimeDisplay').textContent =
+    'show: ' + new Date(nextEpoch * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+  if (getUTC() >= nextEpoch) {
+    fired     = true;
+    syncEpoch = nextEpoch;
+    document.getElementById('countdownNumber').textContent = '▶';
+    document.getElementById('countdownLabel').textContent  = 'tap to join';
+    document.getElementById('showTimeDisplay').textContent = '';
+    document.getElementById('joinBtn').style.display = 'block';
+  } else {
+    setInterval(updateCountdown, 500);
+    updateCountdown();
+  }
 }
 </script>
 </body>
