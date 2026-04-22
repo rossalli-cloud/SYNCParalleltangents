@@ -613,10 +613,10 @@ function startSync() {
     const expected = getUTC() - showEpoch;
     if (expected >= audio.duration) return;
     const drift = audio.currentTime - expected;
-    if (Math.abs(drift) > 1.0) {
+    if (Math.abs(drift) > 0.3) {
       audio.currentTime = Math.min(Math.max(expected, 0), audio.duration - 0.5);
     }
-  }, 2000);
+  }, 1000);
 }
 
 // ─── Load track ───────────────────────────────────────────────────────────────
