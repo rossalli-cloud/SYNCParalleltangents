@@ -74,7 +74,6 @@
       white-space: nowrap;
     }
 
-    /* Tape Window */
     .tape-window {
       background: var(--bg-deep);
       border-radius: 14px;
@@ -110,7 +109,6 @@
     .reel.spinning      { animation: reelSpin 1.8s linear infinite; }
     .reel.spinning-slow { animation: reelSpin 3.5s linear infinite; }
     @keyframes reelSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
     .reel svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     .reel-hub {
       width: 18px; height: 18px;
@@ -183,14 +181,14 @@
     .countdown-section {
       text-align: center;
       margin-bottom: 16px;
-      min-height: 60px;
+      min-height: 70px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
     .countdown-number {
-      font-size: 48px;
+      font-size: 52px;
       font-weight: 700;
       color: var(--gold);
       line-height: 1;
@@ -201,13 +199,43 @@
       font-size: 10px;
       color: var(--text-dim);
       letter-spacing: 0.1em;
-      margin-top: 4px;
+      margin-top: 6px;
     }
-    .show-time-display {
-      font-size: 10px;
-      color: var(--text-muted);
+
+    /* Arm button */
+    .arm-section {
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .arm-btn {
+      background: var(--bg-mid);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text-dim);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
       letter-spacing: 0.08em;
-      margin-top: 4px;
+      padding: 12px 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+    .arm-btn:hover { border-color: var(--gold-dk); color: var(--text); }
+    .arm-btn.armed {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: rgba(200,168,75,0.08);
+      animation: armPulse 2s ease-in-out infinite;
+    }
+    .arm-btn.armed.urgent {
+      border-color: #e87040;
+      color: #e87040;
+      background: rgba(232,112,64,0.08);
+      animation: armPulse 0.6s ease-in-out infinite;
+    }
+    @keyframes armPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(200,168,75,0.0); }
+      50%       { box-shadow: 0 0 0 6px rgba(200,168,75,0.15); }
     }
 
     /* Controls */
@@ -216,10 +244,8 @@
       align-items: center;
       justify-content: center;
       width: 100%;
-      text-align: center;
       margin-bottom: 20px;
     }
-
     .play-btn {
       width: 64px; height: 64px;
       border-radius: 50%;
@@ -233,20 +259,6 @@
     }
     .play-btn:hover  { background: var(--gold); }
     .play-btn:active { transform: scale(0.95); }
-    .play-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    /* Bottom message */
-    .sync-msg {
-      background: var(--bg-deep);
-      border: 1px solid var(--border-dim);
-      border-radius: 6px;
-      color: var(--gold);
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 11px;
-      padding: 10px 12px;
-      text-align: center;
-      line-height: 1.6;
-    }
 
     .status-row {
       margin-top: 10px;
@@ -322,11 +334,15 @@
   <!-- Countdown -->
   <div class="countdown-section" id="countdownSection">
     <div class="countdown-number" id="countdownNumber">—</div>
-    <div class="countdown-label" id="countdownLabel">loading…</div>
-    <div class="show-time-display" id="showTimeDisplay"></div>
+    <div class="countdown-label" id="countdownLabel">tap arm to sync</div>
   </div>
 
-  <!-- Play button (manual fallback) -->
+  <!-- Arm button -->
+  <div class="arm-section">
+    <button class="arm-btn" id="armBtn" onclick="toggleArm()">tap to arm</button>
+  </div>
+
+  <!-- Play button -->
   <div class="controls">
     <button class="play-btn" id="playBtn" onclick="togglePlay()">
       <svg id="playIcon"  width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
@@ -334,27 +350,24 @@
     </button>
   </div>
 
-
+  <div class="status-row" id="statusRow"></div>
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
-// ─── !! CHANGE THIS EACH DAY !! ───────────────────────────────────────────────
-const SHOW_TIME = '2026-04-21T15:28:00Z'; // UTC start time — update before each show
-// ─────────────────────────────────────────────────────────────────────────────
-
 const TRACK_URL = 'https://rossalli-cloud.github.io/SYNCParalleltangents/paralleltangentsmixdown1.mp3';
 
-let audio     = null;
-let isPlaying = false;
-let syncEpoch = null;
-let syncTimer = null;
-let vuTimer   = null;
-let fired     = false;
+let audio        = null;
+let isPlaying    = false;
+let syncEpoch    = null;
+let countdownArmed = false;
+let fireEpoch    = null;
+let iosUnlocked  = false;
+let syncTimer    = null;
+let vuTimer      = null;
 
-function getUTC()  { return Date.now() / 1000; }
-function showEpoch() { return new Date(SHOW_TIME).getTime() / 1000; }
+function getUTC() { return Date.now() / 1000; }
 
 function fmt(s) {
   if (!isFinite(s) || s < 0) return '0:00';
@@ -412,70 +425,90 @@ function reelsStop() {
   document.getElementById('tapeSheen').classList.remove('playing');
 }
 
-// ─── Countdown ────────────────────────────────────────────────────────────────
-function updateCountdown() {
-  const now  = getUTC();
-  const target = showEpoch();
-  const left = target - now;
+// ─── Arm / Disarm ─────────────────────────────────────────────────────────────
+function toggleArm() {
+  if (!audio) { showToast('loading track…'); return; }
 
-  const numEl   = document.getElementById('countdownNumber');
-  const labelEl = document.getElementById('countdownLabel');
-  const timeEl  = document.getElementById('showTimeDisplay');
-
-  // Show the show time in local time
-  timeEl.textContent = 'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-  if (left > 0) {
-    // Still counting down
-    const h = Math.floor(left / 3600);
-    const m = Math.floor((left % 3600) / 60);
-    const s = Math.floor(left % 60);
-
-    if (h > 0) {
-      numEl.textContent = h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-    } else if (m > 0) {
-      numEl.textContent = m + ':' + String(s).padStart(2,'0');
-    } else {
-      numEl.textContent = s;
-    }
-
-    numEl.className = 'countdown-number' + (left <= 10 ? ' urgent' : '');
-    labelEl.textContent = left <= 10 ? 'starting soon' : 'until show starts';
-
-  } else if (!fired) {
-    // Time to fire!
-    fired = true;
-    numEl.textContent = '▶';
-    labelEl.textContent = 'tap to join';
-    document.getElementById('countdownSection').style.cursor = 'pointer';
-    document.getElementById('countdownSection').onclick = togglePlay;
-    document.getElementById('playBtn').style.display = 'none';
-    fireSync();
+  if (countdownArmed) {
+    countdownArmed = false;
+    fireEpoch = null;
+    document.getElementById('armBtn').textContent = 'tap to arm';
+    document.getElementById('armBtn').className = 'arm-btn';
+    document.getElementById('countdownNumber').textContent = '—';
+    document.getElementById('countdownLabel').textContent = 'tap arm to sync';
+    showToast('disarmed');
+    return;
   }
+
+  // Calculate next UTC minute boundary
+  const now    = Date.now();
+  const msToMin = 60000 - (now % 60000);
+  fireEpoch    = (now + msToMin) / 1000;
+  syncEpoch    = fireEpoch;
+  countdownArmed = true;
+
+  // iOS unlock — use this tap as the gesture
+  if (!iosUnlocked) {
+    audio.volume = 0;
+    audio.currentTime = 0;
+    const p = audio.play();
+    if (p) p.then(() => { audio.pause(); audio.currentTime = 0; audio.volume = 1; iosUnlocked = true; }).catch(() => { audio.volume = 1; });
+  }
+
+  document.getElementById('armBtn').className = 'arm-btn armed';
+  showToast('armed · fires at next UTC minute');
+  updateArmCountdown();
 }
 
-// ─── Fire at show time ────────────────────────────────────────────────────────
-function fireSync() {
-  if (!audio) return;
-  syncEpoch = showEpoch();
-  const offset = getUTC() - syncEpoch;
-  audio.currentTime = Math.max(0, offset);
+function updateArmCountdown() {
+  if (!countdownArmed) return;
+  const left = Math.ceil(fireEpoch - getUTC());
+  const numEl   = document.getElementById('countdownNumber');
+  const labelEl = document.getElementById('countdownLabel');
+  const btn     = document.getElementById('armBtn');
 
+  if (left <= 0) {
+    fireSync();
+    return;
+  }
+
+  const urgent = left <= 10;
+  numEl.textContent = left;
+  numEl.className = 'countdown-number' + (urgent ? ' urgent' : '');
+  labelEl.textContent = 'seconds to sync';
+  btn.className = 'arm-btn armed' + (urgent ? ' urgent' : '');
+  btn.textContent = urgent ? '⚡ firing soon' : '● armed';
+
+  setTimeout(updateArmCountdown, 250);
+}
+
+// ─── Fire at minute boundary ──────────────────────────────────────────────────
+function fireSync() {
+  countdownArmed = false;
+  if (!audio) return;
+
+  audio.currentTime = 0;
   audio.play().then(() => {
     isPlaying = true;
+    iosUnlocked = true;
     reelsPlay();
     document.getElementById('playIcon').style.display  = 'none';
     document.getElementById('pauseIcon').style.display = '';
     startSync();
     vuTimer = setInterval(animateVU, 80);
-    setStatus('playing · in sync', true);
-    document.getElementById('countdownLabel').textContent = 'live · in sync';
+    setStatus('live · in sync', true);
+    document.getElementById('armBtn').textContent = '▶ playing in sync';
+    document.getElementById('armBtn').className   = 'arm-btn';
+    document.getElementById('countdownNumber').textContent = '▶';
+    document.getElementById('countdownLabel').textContent  = 'live · in sync';
+    showToast('🔴 live · in sync');
   }).catch(() => {
-    // iOS blocked autoplay — prompt manual tap
     setStatus('tap play to join');
     showToast('tap ▶ to join', 4000);
-    document.getElementById('countdownLabel').textContent = 'tap play to join';
-    document.getElementById('playBtn').style.background = 'var(--gold)';
+    document.getElementById('countdownNumber').textContent = '▶';
+    document.getElementById('countdownLabel').textContent  = 'tap play to join';
+    document.getElementById('armBtn').textContent = 'tap to arm';
+    document.getElementById('armBtn').className   = 'arm-btn';
   });
 }
 
@@ -491,31 +524,28 @@ function togglePlay() {
     reelsStop();
     document.getElementById('playIcon').style.display  = '';
     document.getElementById('pauseIcon').style.display = 'none';
-    document.getElementById('playBtn').style.background = '';
     setStatus('paused');
     return;
   }
 
-  // Seek to correct sync position
-  syncEpoch = showEpoch();
-  const offset = getUTC() - syncEpoch;
-  if (offset >= 0 && isFinite(audio.duration) && offset < audio.duration) {
-    audio.currentTime = offset;
-  } else if (offset >= (audio.duration || 0)) {
-    setStatus('show has ended');
-    return;
+  // Seek to correct sync position if we have an epoch
+  if (syncEpoch !== null) {
+    const offset = getUTC() - syncEpoch;
+    if (offset >= 0 && offset < (audio.duration || 99999)) {
+      audio.currentTime = offset;
+    }
   }
 
   audio.play().then(() => {
     isPlaying = true;
+    iosUnlocked = true;
     reelsPlay();
     document.getElementById('playIcon').style.display  = 'none';
     document.getElementById('pauseIcon').style.display = '';
-    document.getElementById('playBtn').style.background = '';
+    if (!syncEpoch) syncEpoch = getUTC() - audio.currentTime;
     startSync();
     vuTimer = setInterval(animateVU, 80);
     setStatus('playing · in sync', true);
-    document.getElementById('countdownLabel').textContent = 'live · in sync';
   }).catch(() => {
     setStatus('tap play again');
     showToast('tap play again');
@@ -544,8 +574,7 @@ function loadTrack(url) {
   audio.addEventListener('loadedmetadata', () => {
     document.getElementById('duration').textContent =
       isFinite(audio.duration) ? fmt(audio.duration) : '—';
-    // Now that audio is ready, initialize sync
-    initSync();
+    setStatus('ready · tap arm to sync');
   });
 
   audio.addEventListener('timeupdate', () => {
@@ -564,35 +593,6 @@ function loadTrack(url) {
 
   audio.src = url;
   audio.load();
-}
-
-// ─── Init sync after audio is ready ──────────────────────────────────────────
-function initSync() {
-  // Show local time of show
-  document.getElementById('showTimeDisplay').textContent =
-    'show: ' + new Date(SHOW_TIME).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
-  if (getUTC() >= showEpoch()) {
-    // Show time has already passed — show tap to join
-    fired = true;
-    syncEpoch = showEpoch();
-    const offset = getUTC() - syncEpoch;
-    if (offset >= audio.duration) {
-      document.getElementById('countdownNumber').textContent = '—';
-      document.getElementById('countdownLabel').textContent = 'show has ended';
-      return;
-    }
-    document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent = 'tap to join';
-    document.getElementById('countdownSection').style.cursor = 'pointer';
-    document.getElementById('countdownSection').onclick = togglePlay;
-    document.getElementById('playBtn').style.display = 'none';
-  } else {
-    // Countdown to show time
-    document.getElementById('playBtn').style.display = 'none';
-    setInterval(updateCountdown, 1000);
-    updateCountdown();
-  }
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
