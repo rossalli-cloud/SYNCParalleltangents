@@ -165,6 +165,31 @@
       padding-right: 4px;
     }
 
+    .buffer-section {
+      margin-bottom: 12px;
+    }
+    .buffer-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .buffer-track {
+      height: 6px;
+      background: var(--border-dim);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .buffer-fill {
+      height: 100%;
+      background: var(--gold-dk);
+      border-radius: 3px;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    .buffer-fill.ready { background: var(--green); }
+
     .countdown-section {
       text-align: center;
       margin-bottom: 20px;
@@ -194,6 +219,22 @@
       letter-spacing: 0.06em;
       margin-top: 4px;
     }
+
+    .ready-btn {
+      background: var(--gold-dk);
+      border: none;
+      border-radius: 10px;
+      color: #1a1000;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 14px 32px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 16px;
+    }
+    .ready-btn:hover { background: var(--gold); }
 
     .tap-btn {
       display: none;
@@ -402,6 +443,15 @@
     </div>
   </div>
 
+  <button class="ready-btn" id="readyBtn" onclick="iAmReady()">I'm ready</button>
+
+  <div class="buffer-section">
+    <div class="buffer-label" id="bufferLabel">buffering…</div>
+    <div class="buffer-track">
+      <div class="buffer-fill" id="bufferFill"></div>
+    </div>
+  </div>
+
   <div class="countdown-section">
     <div class="countdown-number" id="countdownNumber">—</div>
     <div class="countdown-label"  id="countdownLabel">connecting…</div>
@@ -585,7 +635,28 @@ function updateCountdown(epoch) {
   lblEl.textContent = left <= 10 ? '⚡ sounding soon' : 'until show starts';
 }
 
-// ─── Tap to sound ─────────────────────────────────────────────────────────────
+// ─── I'm ready — iOS unlock + start buffering ─────────────────────────────────
+function iAmReady() {
+  document.getElementById('readyBtn').style.display = 'none';
+
+  // Unlock iOS audio with a silent play/pause gesture
+  audio.volume = 0;
+  audio.currentTime = 0;
+  const p = audio.play();
+  if (p) {
+    p.then(() => {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.volume = 1;
+      // Now force the browser to buffer the full file
+      audio.load();
+    }).catch(() => {
+      audio.volume = 1;
+    });
+  }
+}
+
+
 function tapToSound() {
   if (!audio) return;
   audio.currentTime = 0;
@@ -622,13 +693,24 @@ function loadTrack(url) {
   audio = new Audio();
   audio.crossOrigin = 'anonymous';
   audio.preload = 'auto';
+
   audio.addEventListener('loadedmetadata', () => {
     document.getElementById('duration').textContent =
       isFinite(audio.duration) ? fmt(audio.duration) : '—';
   });
+
+  audio.addEventListener('progress', updateBuffer);
+  audio.addEventListener('canplaythrough', () => {
+    document.getElementById('bufferFill').style.width = '100%';
+    document.getElementById('bufferFill').classList.add('ready');
+    document.getElementById('bufferLabel').textContent = 'ready ✓';
+  });
+
   audio.addEventListener('timeupdate', () => {
     document.getElementById('currentTime').textContent = fmt(audio.currentTime);
+    updateBuffer();
   });
+
   audio.addEventListener('ended', () => {
     isPlaying = false;
     clearInterval(syncTimer);
@@ -638,8 +720,27 @@ function loadTrack(url) {
     document.getElementById('countdownLabel').textContent  = 'track ended';
     document.getElementById('showTimeDisplay').textContent = '';
   });
+
   audio.src = url;
   audio.load();
+}
+
+function updateBuffer() {
+  if (!audio || !audio.duration) return;
+  const fill  = document.getElementById('bufferFill');
+  const label = document.getElementById('bufferLabel');
+  if (audio.buffered.length > 0) {
+    const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+    const pct = Math.min((bufferedEnd / audio.duration) * 100, 100);
+    fill.style.width = pct + '%';
+    if (pct >= 100) {
+      fill.classList.add('ready');
+      label.textContent = 'ready ✓';
+    } else {
+      fill.classList.remove('ready');
+      label.textContent = 'buffering ' + Math.round(pct) + '%';
+    }
+  }
 }
 
 // ─── PIN ──────────────────────────────────────────────────────────────────────
