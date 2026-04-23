@@ -408,7 +408,7 @@
     <div class="show-time-display" id="showTimeDisplay"></div>
   </div>
 
-  <button class="tap-btn" id="tapBtn" onclick="tapToSound()">tap to sound</button>
+  <button class="tap-btn" id="tapBtn" onclick="tapToSound()">Press to Begin</button>
 
   <div class="host-trigger">
     <button onclick="showPinOverlay()">· host ·</button>
@@ -548,10 +548,9 @@ function onShowTimeReceived(epoch) {
   document.getElementById('showTimeDisplay').textContent = 'show: ' + local;
 
   if (getUTC() >= epoch) {
-    // Show time has passed — show tap button
     fired = true;
-    document.getElementById('countdownNumber').textContent = '▶';
-    document.getElementById('countdownLabel').textContent  = 'tap to sound';
+    document.getElementById('countdownNumber').textContent = '';
+    document.getElementById('countdownLabel').textContent  = '';
     document.getElementById('showTimeDisplay').textContent = '';
     document.getElementById('tapBtn').style.display = 'block';
   } else {
@@ -572,9 +571,8 @@ function updateCountdown(epoch) {
   if (left <= 0) {
     fired = true;
     clearInterval(countdownInterval);
-    numEl.textContent = '▶';
-    numEl.className   = 'countdown-number';
-    lblEl.textContent = 'tap to sound';
+    document.getElementById('countdownNumber').textContent = '';
+    document.getElementById('countdownLabel').textContent  = '';
     document.getElementById('showTimeDisplay').textContent = '';
     document.getElementById('tapBtn').style.display = 'block';
     return;
